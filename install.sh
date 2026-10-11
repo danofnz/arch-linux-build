@@ -4,10 +4,6 @@
 # WARNING: wipes the target disk.
 set -euo pipefail
 
-TIMEZONE="${TIMEZONE:-UTC}"
-LOCALE="${LOCALE:-en_US.UTF-8}"
-KEYMAP="${KEYMAP:-us}"
-
 die() { echo "error: $*" >&2; exit 1; }
 ask() { local v; read -rp "$1" v; echo "${v:-$2}"; }
 askpw() { local a b; while :; do
@@ -28,6 +24,21 @@ while :; do
     USERNAME_NEW="$(ask 'Username: ' '')"
     [[ "$USERNAME_NEW" =~ ^[a-z_][a-z0-9_-]{0,30}$ && "$USERNAME_NEW" != root ]] && break
     echo "Invalid username (lowercase letters, digits, _ and -; not root)."
+done
+while :; do
+    TIMEZONE="$(ask 'Timezone [Pacific/Auckland]: ' Pacific/Auckland)"
+    [[ -e "/usr/share/zoneinfo/$TIMEZONE" && -f "/usr/share/zoneinfo/$TIMEZONE" ]] && break
+    echo "Unknown timezone (see /usr/share/zoneinfo)."
+done
+while :; do
+    LOCALE="$(ask 'Locale [en_NZ.UTF-8]: ' en_NZ.UTF-8)"
+    grep -q "^#\?${LOCALE//./\.} " /usr/share/i18n/SUPPORTED && break
+    echo "Unsupported locale (see /usr/share/i18n/SUPPORTED)."
+done
+while :; do
+    KEYMAP="$(ask 'Keymap [us]: ' us)"
+    localectl list-keymaps 2>/dev/null | grep -qx "$KEYMAP" && break
+    echo "Unknown keymap (see localectl list-keymaps)."
 done
 USER_PW="$(askpw "Password for $USERNAME_NEW (administer via sudo)")"
 LUKS_PW="$(askpw 'LUKS disk encryption passphrase')"

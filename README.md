@@ -3,7 +3,7 @@ Arch Linux install script: GNOME on Wayland (GDM), LUKS2 encryption, optional TP
 
 Boot the Arch live ISO in UEFI mode, get this repo, then run as root: `./install.sh`
 
-It prompts for hostname, username, user password, LUKS passphrase, target disk, and
+It prompts for hostname, username, timezone (default Pacific/Auckland), locale (default en_NZ.UTF-8), keymap (default us), user password, LUKS passphrase, target disk, and
 whether to split the disk into separate encrypted root and /home partitions.
 The user is a normal (non-root) account in the `wheel` group and uses `sudo` for admin
 tasks; the root account is locked. If a TPM2 is present, you can enroll it (PCR 7) to
