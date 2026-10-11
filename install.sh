@@ -163,22 +163,12 @@ systemctl enable gdm NetworkManager systemd-resolved
 CHROOT
 rm -f /mnt/root/.pw
 
-# --- TPM2 enrollment (PCR 7 = Secure Boot state) ---
-if [[ -e /dev/tpmrm0 ]]; then
-    TPM="$(ask 'Enroll TPM2 auto-unlock for the encrypted disk(s)? [Y/n]: ' y)"
-    if [[ "${TPM,,}" == y* ]]; then
-        for dev in "$ROOTP" ${ROOT_SIZE:+"$HOMEP"}; do
-            PASSWORD="$LUKS_PW" systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=7 "$dev" \
-                || echo "warning: TPM2 enrollment failed for $dev; passphrase still works"
-        done
-        echo "Note: PCR 7 requires Secure Boot state to match; if unlock stops working, re-enroll."
-    fi
-else
-    echo "No TPM2 device found; skipping enrollment. Tools are installed; run later:"
-    echo "  systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=7 $ROOTP"
-fi
-
 umount -R /mnt
 cryptsetup close crypthome 2>/dev/null || true
 cryptsetup close cryptroot || true
-echo "Done. Reboot, log in via GDM (GNOME on Wayland) as $USERNAME_NEW; use sudo for admin tasks."
+echo "Done. Enable Secure Boot in firmware, then reboot and log in as $USERNAME_NEW."
+echo "After Secure Boot is enabled, optional TPM2 enrollment for automatic unlock:"
+echo "  systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=7 $ROOTP"
+if [[ -n "$ROOT_SIZE" ]]; then
+    echo "  systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=7 $HOMEP"
+fi
