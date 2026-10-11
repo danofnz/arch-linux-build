@@ -13,10 +13,6 @@ askpw() { local a b; while :; do
 
 [[ $EUID -eq 0 ]] || die "run as root"
 [[ -d /sys/firmware/efi/efivars ]] || die "UEFI boot mode required"
-SETUP_MODE_VAR="$(find /sys/firmware/efi/efivars -maxdepth 1 -name 'SetupMode-*' -print -quit)"
-[[ -n "$SETUP_MODE_VAR" ]] || die "cannot read UEFI Secure Boot setup mode"
-SETUP_MODE="$(od -An -j4 -N1 -tu1 "$SETUP_MODE_VAR" | tr -d '[:space:]')"
-[[ "$SETUP_MODE" == 1 ]] || die "enter Secure Boot Setup Mode in firmware (clear Secure Boot keys) before installing"
 
 # --- Prompts ---
 while :; do
@@ -102,7 +98,7 @@ UCODE=""
 grep -qi GenuineIntel /proc/cpuinfo && UCODE=intel-ucode
 grep -qi AuthenticAMD /proc/cpuinfo && UCODE=amd-ucode
 pacstrap -K /mnt base linux linux-firmware sudo networkmanager cryptsetup \
-    tpm2-tss tpm2-tools sbctl \
+    tpm2-tss tpm2-tools \
     gnome gnome-tweaks gdm xdg-desktop-portal-gnome pipewire wireplumber \
     pipewire-pulse xorg-xwayland qt5-wayland qt6-wayland $UCODE
 
@@ -147,14 +143,6 @@ initrd  /initramfs-linux.img
 options $CMDLINE
 ENTRY
 
-# Enroll custom keys and sign the boot chain. Secure Boot must be enabled in
-# firmware after rebooting; the installer cannot change firmware settings.
-sbctl create-keys
-sbctl enroll-keys --microsoft --yes-this-might-brick-my-machine
-sbctl sign -s /boot/EFI/systemd/systemd-bootx64.efi
-sbctl sign -s /boot/EFI/BOOT/BOOTX64.EFI
-sbctl sign -s /boot/vmlinuz-linux
-
 # Non-root user; admin rights only via sudo (wheel group, password required)
 useradd -m -G wheel -s /bin/bash "$USERNAME_NEW"
 chpasswd < /root/.pw
@@ -171,8 +159,8 @@ rm -f /mnt/root/.pw
 umount -R /mnt
 cryptsetup close crypthome 2>/dev/null || true
 cryptsetup close cryptroot || true
-echo "Done. Enable Secure Boot in firmware, then reboot and log in as $USERNAME_NEW."
-echo "After Secure Boot is enabled, optional TPM2 enrollment for automatic unlock:"
+echo "Done. Reboot and log in as $USERNAME_NEW."
+echo "Optional TPM2 enrollment for automatic unlock (PCR 7 reflects current Secure Boot state):"
 echo "  systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=7 $ROOTP"
 if [[ -n "$ROOT_SIZE" ]]; then
     echo "  systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=7 $HOMEP"
