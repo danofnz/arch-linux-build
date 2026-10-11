@@ -13,6 +13,10 @@ askpw() { local a b; while :; do
 
 [[ $EUID -eq 0 ]] || die "run as root"
 [[ -d /sys/firmware/efi/efivars ]] || die "UEFI boot mode required"
+SETUP_MODE_VAR="$(find /sys/firmware/efi/efivars -maxdepth 1 -name 'SetupMode-*' -print -quit)"
+[[ -n "$SETUP_MODE_VAR" ]] || die "cannot read UEFI Secure Boot setup mode"
+SETUP_MODE="$(od -An -j4 -N1 -tu1 "$SETUP_MODE_VAR" | tr -d '[:space:]')"
+[[ "$SETUP_MODE" == 1 ]] || die "enter Secure Boot Setup Mode in firmware (clear Secure Boot keys) before installing"
 
 # --- Prompts ---
 while :; do
@@ -93,7 +97,7 @@ UCODE=""
 grep -qi GenuineIntel /proc/cpuinfo && UCODE=intel-ucode
 grep -qi AuthenticAMD /proc/cpuinfo && UCODE=amd-ucode
 pacstrap -K /mnt base linux linux-firmware sudo networkmanager cryptsetup \
-    tpm2-tss tpm2-tools \
+    tpm2-tss tpm2-tools sbctl \
     gnome gnome-tweaks gdm xdg-desktop-portal-gnome pipewire wireplumber \
     pipewire-pulse xorg-xwayland qt5-wayland qt6-wayland $UCODE
 
@@ -137,6 +141,14 @@ ${INITRD_UCODE:-}
 initrd  /initramfs-linux.img
 options $CMDLINE
 ENTRY
+
+# Enroll custom keys and sign the boot chain. Secure Boot must be enabled in
+# firmware after rebooting; the installer cannot change firmware settings.
+sbctl create-keys
+sbctl enroll-keys --microsoft --yes-this-might-brick-my-machine
+sbctl sign -s /boot/EFI/systemd/systemd-bootx64.efi
+sbctl sign -s /boot/EFI/BOOT/BOOTX64.EFI
+sbctl sign -s /boot/vmlinuz-linux
 
 # Non-root user; admin rights only via sudo (wheel group, password required)
 useradd -m -G wheel -s /bin/bash "$USERNAME_NEW"
