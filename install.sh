@@ -48,8 +48,13 @@ USER_PW="$(askpw "Password for $USERNAME_NEW (administer via sudo)")"
 LUKS_PW="$(askpw 'LUKS disk encryption passphrase')"
 
 lsblk -dpno NAME,SIZE,MODEL
-DISK="$(ask 'Target disk (e.g. /dev/sda): ' '')"
-[[ -b "$DISK" ]] || die "$DISK is not a block device"
+DISK="$(ask 'Target disk (device path or name, e.g. /dev/sda or sda): ' '')"
+[[ "$DISK" == /* ]] || DISK="/dev/$DISK"
+DISK_INPUT="$DISK"
+DISK="$(readlink -e -- "$DISK_INPUT" 2>/dev/null)" || die "disk '$DISK_INPUT' does not exist or cannot be resolved"
+[[ -b "$DISK" ]] || die "disk '$DISK' is not a block device; choose one of the disks listed above"
+DISK_TYPE="$(lsblk -dnro TYPE -- "$DISK" 2>/dev/null || true)"
+[[ "$DISK_TYPE" == disk ]] || die "'$DISK' is not a whole disk; select a disk, not a partition"
 
 SPLIT="$(ask 'Split disk into separate encrypted root and /home? [y/N]: ' n)"
 ROOT_SIZE=""
